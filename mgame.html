@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Magnet Road 🧲</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: black;
+      font-family: Arial, sans-serif;
+      cursor: pointer;
+    }
+
+    canvas {
+      display: block;
+    }
+
+    #score {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      color: pink;
+      font-size: 24px;
+      font-weight: bold;
+    }
+
+    #controls {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.5);
+      color: pink;
+      font-size: 18px;
+      padding: 10px 20px;
+      border-radius: 12px;
+    }
+
+    #gameOverScreen {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      color: white;
+      font-size: 32px;
+      font-weight: bold;
+      display: none;
+    }
+
+    #restartBtn {
+      margin-top: 20px;
+      padding: 12px 24px;
+      font-size: 20px;
+      background: pink;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas"></canvas>
+  <div id="score">Score: 0</div>
+  <div id="controls">Click anywhere to FLIP gravity 🧲</div>
+  <div id="gameOverScreen">
+    Game Over
+    <button id="restartBtn">Restart</button>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const scoreEl = document.getElementById("score");
+    const gameOverScreen = document.getElementById("gameOverScreen");
+    const restartBtn = document.getElementById("restartBtn");
+
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    let position = "floor";
+    let obstacles = [];
+    let score = 0;
+    let gameOver = false;
+    let speed = 2;
+    let spawnRate = 1500;
+    let lastSpawn = 0;
+
+    const player = {
+      x: 80,
+      y: canvas.height * 0.75,
+      radius: 20,
+      color: "rgba(255,20,147,0.95)", // vibrant pink
+    };
+
+    function togglePosition() {
+      if (gameOver) return;
+      position = position === "floor" ? "ceiling" : "floor";
+      player.y = position === "floor" ? canvas.height * 0.75 : canvas.height * 0.25;
+    }
+
+    function randomColor() {
+      const colors = ["pink","cyan","lime","yellow","orange","violet"];
+      return colors[Math.floor(Math.random()*colors.length)];
+    }
+
+    function spawnObstacle() {
+      obstacles.push({
+        x: canvas.width + 50,
+        y: Math.random() > 0.5 ? canvas.height * 0.75 : canvas.height * 0.25,
+        size: 30 + Math.random() * 40,
+        color: randomColor()
+      });
+    }
+
+    function update(delta) {
+      if (gameOver) return;
+
+      // Update obstacles
+      obstacles.forEach(o => o.x -= speed);
+      obstacles = obstacles.filter(o => o.x + o.size > 0);
+
+      // Collision detection
+      obstacles.forEach(o => {
+        if (Math.abs(player.x - o.x) < player.radius + o.size/2 &&
+            Math.abs(player.y - o.y) < player.radius + o.size/2) {
+          gameOver = true;
+          gameOverScreen.style.display = "flex";
+        }
+      });
+
+      // Score and difficulty
+      score++;
+      scoreEl.textContent = "Score: " + score;
+      speed = Math.min(speed + 0.002, 12);
+      spawnRate = Math.max(400, 1500 - score/2); // spawn faster over time
+    }
+
+    function draw() {
+      // background
+      ctx.fillStyle = "black";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // starry sky
+      for (let i=0;i<80;i++) {
+        ctx.fillStyle = "white";
+        ctx.globalAlpha = Math.random();
+        ctx.fillRect(Math.random()*canvas.width, Math.random()*canvas.height, 2, 2);
+      }
+      ctx.globalAlpha = 1;
+
+      // road lines
+      ctx.fillStyle = "rgba(255,20,147,0.5)";
+      ctx.fillRect(0, canvas.height*0.75, canvas.width, 3);
+      ctx.fillRect(0, canvas.height*0.25, canvas.width, 3);
+
+      // player
+      ctx.shadowBlur = 40;
+      ctx.shadowColor = "deeppink";
+      ctx.fillStyle = player.color;
+      ctx.beginPath();
+      ctx.arc(player.x, player.y, player.radius, 0, Math.PI*2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      // obstacles
+      obstacles.forEach(o => {
+        ctx.shadowBlur = 30;
+        ctx.shadowColor = o.color;
+        ctx.fillStyle = o.color;
+        ctx.beginPath();
+        ctx.arc(o.x, o.y, o.size/2, 0, Math.PI*2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      });
+    }
+
+    let lastTime = 0;
+    function gameLoop(timestamp) {
+      const delta = timestamp - lastTime;
+      lastTime = timestamp;
+
+      update(delta);
+      draw();
+
+      if (!gameOver) {
+        if (timestamp - lastSpawn > spawnRate) {
+          spawnObstacle();
+          lastSpawn = timestamp;
+        }
+        requestAnimationFrame(gameLoop);
+      }
+    }
+
+    canvas.addEventListener("click", togglePosition);
+    restartBtn.addEventListener("click", () => {
+      obstacles = [];
+      score = 0;
+      speed = 2;
+      spawnRate = 1500;
+      gameOver = false;
+      gameOverScreen.style.display = "none";
+      position = "floor";
+      player.y = canvas.height * 0.75;
+      requestAnimationFrame(gameLoop);
+    });
+
+    requestAnimationFrame(gameLoop);
+  </script>
+</body>
+</html>
